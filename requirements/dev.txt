@@ -1,0 +1,4 @@
+-r core.txt
+
+tox>=3.23.1
+devpi>=2.2.0
