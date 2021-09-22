@@ -20,27 +20,35 @@ class BaseClient:
 
     executor = ThreadPoolExecutor(thread_name_prefix="app_client")
 
-    log = logging.getLogger(__name__)
+    @property
+    def log(self):
+        if not self._log:
+            self._log = logging.getLogger(__name__)
+            self._log.addHandler(logging.StreamHandler())
+        return self._log
 
     def __init__(self, base_url: t.Optional[str] = None):
         self.base_url = base_url or self.BASE_URL
+        self._log = None
 
-    def _handle_pre_request(self, method: str, url: str, kwargs: dict):
+    def _handle_pre_request(self, method: str, uri: str, kwargs: dict):
         set_default_headers(request_kwargs=kwargs)
 
-    def request(
-        self, method: str, rule: str, url_prefix: t.Optional[str] = None, **kwargs
-    ):
-        url_prefix = url_prefix or self.URL_PREFIX
+    def build_uri(self, rule: str, **kwargs):
+        url_prefix = kwargs.pop("url_prefix", self.URL_PREFIX)
         if not rule.startswith(url_prefix):
             url = (url_prefix + rule).replace("//", "/")
         else:
             url = rule
+        return url
+
+    def request(self, method: str, rule: str, **kwargs):
+        uri = self.build_uri(rule=rule, **kwargs)
 
         base_url = kwargs.pop("base_url", self.base_url)
-        request_url = parse.urljoin(base_url, url)
+        request_url = parse.urljoin(base_url, uri)
 
-        self._handle_pre_request(method, url, kwargs)
+        self._handle_pre_request(method, uri, kwargs)
 
         return self._request(method, request_url, **kwargs)
 
