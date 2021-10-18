@@ -1,17 +1,22 @@
 """ client基类模块."""
+import inspect
 import json
 import logging
 import typing as t
 from concurrent.futures import ThreadPoolExecutor
 from urllib import parse
 
-import requests  # type:ignore
-
-from .exceptions import RemoteCallError
-from .utils import set_default_headers
+import requests
 
 
 class BaseClient:
+    """
+    为应用服务提供远程调用功能,
+    注意：本基类不做任何异常处理，异常处理需子类实现.
+    Attributes:
+        base_url: 域名,默认为cls.BASE_URL
+
+    """
     BASE_URL: str = ""
 
     URL_PREFIX: str = ""
@@ -22,19 +27,35 @@ class BaseClient:
 
     @property
     def log(self):
-        if not self._log:
-            self._log = logging.getLogger(__name__)
-            self._log.addHandler(logging.StreamHandler())
+        if self._log is None:
+            self._log = logging.getLogger(self.__class__.__module__ + '.' +
+                                          self.__class__.__name__)
+            if not self._log.handlers:
+                self._log.addHandler(self.logger_handler)
         return self._log
 
     def __init__(self, base_url: t.Optional[str] = None):
         self.base_url = base_url or self.BASE_URL
         self._log = None
+        self.logger_handler = logging.StreamHandler()
 
     def _handle_pre_request(self, method: str, uri: str, kwargs: dict):
-        set_default_headers(request_kwargs=kwargs)
+        """ 请求前预处理."""
+        if "headers" not in kwargs:
+            kwargs["headers"] = dict()
+
+        kwargs["headers"]["Content-Type"] = "application/json"
 
     def build_uri(self, rule: str, **kwargs):
+        """
+        构建请求uri.
+        Args:
+            rule: 资源路径
+            **kwargs:
+
+        Returns:
+            url_prefix + rule
+        """
         url_prefix = kwargs.pop("url_prefix", self.URL_PREFIX)
         if not rule.startswith(url_prefix):
             url = (url_prefix + rule).replace("//", "/")
@@ -44,11 +65,10 @@ class BaseClient:
 
     def request(self, method: str, rule: str, **kwargs):
         uri = self.build_uri(rule=rule, **kwargs)
+        self._handle_pre_request(method, uri, kwargs)
 
         base_url = kwargs.pop("base_url", self.base_url)
         request_url = parse.urljoin(base_url, uri)
-
-        self._handle_pre_request(method, uri, kwargs)
 
         return self._request(method, request_url, **kwargs)
 
@@ -59,33 +79,34 @@ class BaseClient:
         **kwargs,
     ):
         """
+        发送请求调用.
+        这里预留了拓展,子类可以通过kwargs来自定义参数作自定义功能
 
-        :param method: 请求方式 GET/POST/PUT/DELETE...
-        :param request_url: 请求地址
-        :param kwargs: 参考 :func:`requests.sessions.request`
-        :return:
+        Args:
+            method: 请求方式 GET/POST/PUT/DELETE...
+            request_url: 请求地址
+            kwargs: 请求参数以及自定义拓展参数
+                    请求参数参考 :func:`requests.sessions.request`
+
         """
+        # http.request函数签名所定义的参数
+        allow_request_param_key = set(
+            inspect.signature(self.http.request).parameters.keys())
+        # kwarg中符合http.request函数中的参数
+        input_request_param_key = set(
+            kwargs.keys()).intersection(allow_request_param_key)
+
         res: requests.Response = self.http.request(
-            method=method, url=request_url, **kwargs
-        )
-        try:
-            res.raise_for_status()
-        except requests.RequestException as e:
-            msg = (
-                f"\n【请求地址】: {method.upper()} {request_url}"
-                f"\n【请求参数】：{kwargs}"
-                f"\n【异常信息】：{e}"
-            )
-            self.log.error(msg)
-            raise RemoteCallError(msg=msg, request=e.request, response=e.response)
+            method=method,
+            url=request_url,
+            **{k: v for k, v in kwargs.items() if k in input_request_param_key})
+        res.raise_for_status()
 
         result = self._handle_result(res, method, request_url, **kwargs)
 
-        self.log.debug(
-            f"\n【请求地址】: {method.upper()} {request_url}"
-            f"\n【请求参数】：{kwargs}"
-            f"\n【响应数据】：{result}"
-        )
+        self.log.info(f"\n【请求地址】: {method.upper()} {request_url}"
+                       f"\n【请求参数】：{kwargs}"
+                       f"\n【响应数据】：{result}")
         return result
 
     def _decode_result(self, res: requests.Response):
@@ -93,7 +114,7 @@ class BaseClient:
         try:
             res = res.json()
         except json.JSONDecodeError:
-            self.log.debug("无法将response解析为json", exc_info=True)
+            self.log.info("无法将调用结果解析为json", exc_info=True)
             res = res.text
         return res
 
@@ -104,8 +125,16 @@ class BaseClient:
         request_url: str,
         **kwargs,
     ):
-        """处理请求结果.
+        """
+        处理请求结果.
         包含返回码处理,序列化结果,以及自定义结果处理。
+
+        Attributes:
+            res: 调用结果
+            method: 调用方法
+            request_url: 请求url
+            kwargs: 请求参数以及自定义拓展参数
+                    请求参数参考 :func:`requests.sessions.request`
         """
         if not isinstance(res, dict):
             result = self._decode_result(res)

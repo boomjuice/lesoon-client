@@ -5,7 +5,7 @@ basedir = os.path.abspath(os.path.dirname(__file__))
 
 class Config:
     # flask
-    SECRET_KEY = os.environ.get("SECRET_KEY") or "secret key"
+    SECRET_KEY = os.environ.get("SECRET_KEY")
     PROPAGATE_EXCEPTIONS = True
     # sqlalchemy
     SQLALCHEMY_ECHO = False
@@ -27,14 +27,10 @@ class DevelopmentConfig(Config):
 
     # sqlalchemy
     SQLALCHEMY_ECHO = True
-    SQLALCHEMY_DATABASE_URI = os.environ.get(
-        "DEV_DATABASE_URL"
-    ) or "sqlite:///" + os.path.join(basedir, "data.sqlite")
+    SQLALCHEMY_DATABASE_URI = os.environ.get("DEV_DATABASE_URL")
 
     # jwt
-    JWT_SECRET_KEY = (
-        os.environ.get("DEV_JWT_SECRET_KEY") or "COMBELLEeyJh6cFQ6IkpXIPJ9BPETRFP"
-    )
+    JWT_SECRET_KEY = os.environ.get("DEV_JWT_SECRET_KEY")
 
 
 config = {"development": DevelopmentConfig, "default": DevelopmentConfig}

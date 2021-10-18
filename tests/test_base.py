@@ -1,8 +1,9 @@
 import json
 
 import pytest
+import requests
 
-from lesoon_client.base import BaseClient
+from lesoon_client import BaseClient
 
 
 class SimpleClient(BaseClient):
@@ -10,7 +11,7 @@ class SimpleClient(BaseClient):
     URL_PREFIX = "/simple"
 
 
-class TestBase:
+class TestBaseClient:
     client = None
 
     @classmethod
@@ -47,3 +48,7 @@ class TestBase:
         assert resp["method"] == "DELETE"
         assert resp["params"] == params
         assert resp["data"] == data
+
+    def test_http_exception(self):
+        with pytest.raises(requests.exceptions.HTTPError):
+            r = self.client.GET("/simple/httpException")
