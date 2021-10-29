@@ -17,13 +17,13 @@ class BaseClient:
         base_url: 域名,默认为cls.BASE_URL
 
     """
-    BASE_URL: str = ""
+    BASE_URL: str = ''
 
-    URL_PREFIX: str = ""
+    URL_PREFIX: str = ''
 
     http = requests.Session()
 
-    executor = ThreadPoolExecutor(thread_name_prefix="app_client")
+    executor = ThreadPoolExecutor(thread_name_prefix='app_client')
 
     @property
     def log(self):
@@ -41,10 +41,10 @@ class BaseClient:
 
     def _handle_pre_request(self, method: str, uri: str, kwargs: dict):
         """ 请求前预处理."""
-        if "headers" not in kwargs:
-            kwargs["headers"] = dict()
+        if 'headers' not in kwargs:
+            kwargs['headers'] = dict()
 
-        kwargs["headers"]["Content-Type"] = "application/json"
+        kwargs['headers']['Content-Type'] = 'application/json'
 
     def build_uri(self, rule: str, **kwargs):
         """
@@ -56,9 +56,9 @@ class BaseClient:
         Returns:
             url_prefix + rule
         """
-        url_prefix = kwargs.pop("url_prefix", self.URL_PREFIX)
+        url_prefix = kwargs.pop('url_prefix', self.URL_PREFIX)
         if not rule.startswith(url_prefix):
-            url = (url_prefix + rule).replace("//", "/")
+            url = (url_prefix + rule).replace('//', '/')
         else:
             url = rule
         return url
@@ -67,7 +67,7 @@ class BaseClient:
         uri = self.build_uri(rule=rule, **kwargs)
         self._handle_pre_request(method, uri, kwargs)
 
-        base_url = kwargs.pop("base_url", self.base_url)
+        base_url = kwargs.pop('base_url', self.base_url)
         request_url = parse.urljoin(base_url, uri)
 
         return self._request(method, request_url, **kwargs)
@@ -104,9 +104,9 @@ class BaseClient:
 
         result = self._handle_result(res, method, request_url, **kwargs)
 
-        self.log.info(f"\n【请求地址】: {method.upper()} {request_url}"
-                       f"\n【请求参数】：{kwargs}"
-                       f"\n【响应数据】：{result}")
+        self.log.info(f'\n【请求地址】: {method.upper()} {request_url}'
+                      f'\n【请求参数】：{kwargs}'
+                      f'\n【响应数据】：{result}')
         return result
 
     def _decode_result(self, res: requests.Response):
@@ -114,7 +114,7 @@ class BaseClient:
         try:
             res = res.json()
         except json.JSONDecodeError:
-            self.log.info("无法将调用结果解析为json", exc_info=True)
+            self.log.info('无法将调用结果解析为json', exc_info=True)
             res = res.text
         return res
 
@@ -144,13 +144,13 @@ class BaseClient:
         return result
 
     def GET(self, rule: str, **kwargs):
-        return self.request("GET", rule, **kwargs)
+        return self.request('GET', rule, **kwargs)
 
     def POST(self, rule: str, **kwargs):
-        return self.request("POST", rule, **kwargs)
+        return self.request('POST', rule, **kwargs)
 
     def PUT(self, rule: str, **kwargs):
-        return self.request("PUT", rule, **kwargs)
+        return self.request('PUT', rule, **kwargs)
 
     def DELETE(self, rule: str, **kwargs):
-        return self.request("DELETE", rule, **kwargs)
+        return self.request('DELETE', rule, **kwargs)

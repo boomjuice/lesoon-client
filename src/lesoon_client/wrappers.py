@@ -12,7 +12,7 @@ try:
     from lesoon_common import ServiceError
 
 except ImportError:
-    print("无法从lesoon-common导入模块,请检查是否已安装lesoon-common")
+    print('无法从lesoon-common导入模块,请检查是否已安装lesoon-common')
     ResponseCode = None
     PageParam = None
     request = None
@@ -20,9 +20,9 @@ except ImportError:
 
 
 class LesoonClient(BaseClient):
-    BASE_URL = os.environ.get("BASE_URL", "")
+    BASE_URL = os.environ.get('BASE_URL', '')
 
-    MODULE_NAME = ""
+    MODULE_NAME = ''
 
     def __init__(self, *args, **kwargs):
         from flask.logging import default_handler
@@ -35,18 +35,44 @@ class LesoonClient(BaseClient):
     def set_token(kwargs):
         from lesoon_common.utils.jwt import create_system_token
         # 请求token
-        token = ""
+        token = ''
         try:
             token = request.token
         except RuntimeError:
             pass
-        kwargs["headers"]["token"] = token or create_system_token()
+        kwargs['headers']['token'] = token or create_system_token()
 
     @staticmethod
-    def inherit_headers(kwargs):
-        # 灰度发布请求头
-        kwargs["headers"]["user-speciality"] = request.headers.get(
-            "user-speciality")
+    def inherit_custom_headers(kwargs):
+        """ 从headers继承自定义的key-value."""
+        if 'user-speciality' in request.headers.keys():
+            kwargs['headers']['user-speciality'] = request.headers.get(
+                'user-speciality')
+
+    def inherit_trace_headers(self, kwargs):
+        """ 从headers继承链路跟踪的key-value."""
+
+        # B3规范请求头
+        try:
+            from opentracing.propagation import Format
+            from opentracing_instrumentation.request_context import get_current_span
+            from flask.ctx import has_request_context
+            from flask.globals import current_app
+            if (has_request_context() and
+                    'link_tracer' in current_app.extensions):
+                link_tracer = current_app.extensions['link_tracer']
+                link_tracer.tracer.inject(
+                    span_context=link_tracer.get_span().context,
+                    format=Format.HTTP_HEADERS,
+                    carrier=kwargs['headers'])
+        except Exception as e:
+            self.log.warning(f'拷贝链路跟踪请求头异常:{e}')
+
+        # istio规范请求头
+        incoming_header_keys = ['x-request-id', 'x-ot-span-context']
+        for key in incoming_header_keys:
+            if value := request.headers.get(key):
+                kwargs['headers'][key] = value
 
     def check_base_url(self):
         """
@@ -58,11 +84,11 @@ class LesoonClient(BaseClient):
         else:
             from flask.ctx import has_app_context
             from flask.globals import current_app
-            if has_app_context() and current_app.config.get("BASE_URL"):
+            if has_app_context() and current_app.config.get('BASE_URL'):
                 # 如果是在应用内调用则直接取配置
-                self.base_url = current_app.config["BASE_URL"]
+                self.base_url = current_app.config['BASE_URL']
             else:
-                raise RuntimeError("Client调用缺少BASE_URL参数,请检查相关配置")
+                raise RuntimeError('Client调用缺少BASE_URL参数,请检查相关配置')
 
     def _handle_pre_request(self, method: str, uri: str, kwargs: dict):
         """
@@ -79,7 +105,8 @@ class LesoonClient(BaseClient):
         super()._handle_pre_request(method, uri, kwargs)
         self.check_base_url()
         self.set_token(kwargs)
-        self.inherit_headers(kwargs)
+        self.inherit_custom_headers(kwargs)
+        self.inherit_trace_headers(kwargs)
 
     def build_uri(self, rule: str, **kwargs) -> str:
         """
@@ -93,10 +120,10 @@ class LesoonClient(BaseClient):
         Returns:
 
         """
-        url_prefix = kwargs.pop("url_prefix", self.URL_PREFIX)
-        module_name = kwargs.pop("module_name", self.MODULE_NAME)
+        url_prefix = kwargs.pop('url_prefix', self.URL_PREFIX)
+        module_name = kwargs.pop('module_name', self.MODULE_NAME)
 
-        uri = (url_prefix + module_name + rule).replace("//", "/")
+        uri = (url_prefix + module_name + rule).replace('//', '/')
         return uri
 
     def _request(
@@ -122,10 +149,10 @@ class LesoonClient(BaseClient):
                 method=method, request_url=request_url, **kwargs)
         except requests.HTTPError as e:
             if e.response.status_code == ServiceUnavailable.code:
-                result = success_response(msg="系统繁忙,请稍后重试")
+                result = success_response(msg='系统繁忙,请稍后重试')
             else:
-                self.log.error(f"\n【请求地址】: {method.upper()} {request_url}" +
-                               f"\n【异常信息】：{e}" + f"\n【请求参数】：{kwargs}")
+                self.log.error(f'\n【请求地址】: {method.upper()} {request_url}' +
+                               f'\n【异常信息】：{e}' + f'\n【请求参数】：{kwargs}')
                 raise ServiceError(code=ResponseCode.RemoteCallError)
         return result
 
@@ -151,14 +178,14 @@ class LesoonClient(BaseClient):
         """
         from lesoon_common import Response as LesoonResponse
 
-        silent = kwargs.pop("silent", False)
+        silent = kwargs.pop('silent', False)
         result = super()._handle_result(res, method, request_url, **kwargs)
 
-        if isinstance(result, dict) and "flag" in result:
+        if isinstance(result, dict) and 'flag' in result:
             resp = LesoonResponse.load(result)
             if resp.code != ResponseCode.Success.code and not silent:
-                self.log.error(f"\n【请求地址】: {method.upper()} {request_url}" +
-                               f"\n【异常信息】：{resp.flag}" + f"\n【请求参数】：{kwargs}")
+                self.log.error(f'\n【请求地址】: {method.upper()} {request_url}' +
+                               f'\n【异常信息】：{resp.flag}' + f'\n【请求参数】：{kwargs}')
                 raise ServiceError(code=ResponseCode.RemoteCallError)
             return resp
         else:
@@ -179,17 +206,17 @@ class LesoonClient(BaseClient):
         Returns:
             `lesoon_common.Response`
         """
-        if "params" not in kwargs:
-            kwargs["params"] = {}
+        if 'params' not in kwargs:
+            kwargs['params'] = {}
 
-        kwargs["params"].update({
-            "ifPage": int(page_param.if_page),
-            "where": json.dumps(page_param.where),
+        kwargs['params'].update({
+            'ifPage': int(page_param.if_page),
+            'where': json.dumps(page_param.where),
         })
         if page_param.if_page:
-            kwargs["params"].update({
-                "page": page_param.page,
-                "pageSize": page_param.page_size
+            kwargs['params'].update({
+                'page': page_param.page,
+                'pageSize': page_param.page_size
             })
 
         return self.GET(rule=rule, **kwargs)
@@ -210,20 +237,20 @@ class LesoonClient(BaseClient):
             `lesoon_common.Response`
 
         """
-        if "params" not in kwargs:
-            kwargs["params"] = {}
+        if 'params' not in kwargs:
+            kwargs['params'] = {}
 
         if not page_param.if_page:
             # petrel体系中带page后缀为分页,反之不分页
-            rule = rule.replace("/page", "")
+            rule = rule.replace('/page', '')
         else:
-            kwargs["params"].update({
-                "page.pn": page_param.page,
-                "page.size": page_param.page_size
+            kwargs['params'].update({
+                'page.pn': page_param.page,
+                'page.size': page_param.page_size
             })
 
         if page_param.where:
-            kwargs["params"].update(
-                {f"search.{k}": v for k, v in page_param.where.items()})
+            kwargs['params'].update(
+                {f'search.{k}': v for k, v in page_param.where.items()})
 
         return self.GET(rule=rule, **kwargs)

@@ -10,37 +10,37 @@ from lesoon_client.wrappers import LesoonClient
 
 app = LesoonFlask(config=DevelopmentConfig)
 
-bp = blueprints.Blueprint("lesoon_client", __name__)
+bp = blueprints.Blueprint('lesoon_client', __name__)
 
 api = LesoonApi(bp)
 
 
 class SimpleClient(LesoonClient):
-    BASE_HOST = "http://127.0.0.1"
-    URL_PREFIX = "/simple"
+    BASE_HOST = 'http://127.0.0.1'
+    URL_PREFIX = '/simple'
 
     def get_test(self, text: str):
-        return self.get("/test", params={"text": text})
+        return self.get('/test', params={'text': text})
 
 
 class SimpleView(LesoonView):
     simple_client = SimpleClient()
 
-    @route("/test", methods=["GET"])
+    @route('/test', methods=['GET'])
     @request_param()
     def test(self, text: str):
-        return f"echo :{text}"
+        return f'echo :{text}'
 
-    @route("/testClient", methods=["GET"], skip_decorator=True)
+    @route('/testClient', methods=['GET'], skip_decorator=True)
     @request_param()
     def test_client(self, text: str):
         res = self.simple_client.get_test(text)
         return res
 
 
-api.register_view(SimpleView, "/simple", endpoint="simple")
+api.register_view(SimpleView, '/simple', endpoint='simple')
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     app.register_blueprint(bp)
     print(app.url_map)
     app.run(port=12345, debug=True)

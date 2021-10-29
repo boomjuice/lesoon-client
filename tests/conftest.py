@@ -33,35 +33,35 @@ def view(app):
 
     class SimpleView(BaseView):
 
-        @route("/", methods=["GET", "POST", "PUT", "DELETE"])
+        @route('/', methods=['GET', 'POST', 'PUT', 'DELETE'])
         def simple(self):
             return {
-                "method": request.method,
-                "params": request.args,
-                "data": request.get_json(silent=True),
-                "headers": dict(request.headers)
+                'method': request.method,
+                'params': request.args,
+                'data': request.get_json(silent=True),
+                'headers': dict(request.headers.items(lower=True))
             }
 
-        @route("/httpException", methods=["GET"])
+        @route('/httpException', methods=['GET'])
         def raise_http_exception(self):
             raise NotFound()
 
-        @route("/serviceException", methods=["GET"])
+        @route('/serviceException', methods=['GET'])
         def raise_server_exception(self):
             raise ServiceError()
 
-        @route("/serviceUnavailable", methods=["GET"])
+        @route('/serviceUnavailable', methods=['GET'])
         def raise_service_unavailable(self):
             raise ServiceUnavailable()
 
-    SimpleView.register(app, "/simple", endpoint="simple")
+    SimpleView.register(app, '/simple', endpoint='simple')
 
 
 @pytest.fixture
 def server(app, view):
-    srv = make_server(host="localhost", port=12345, app=app, threaded=True)
+    srv = make_server(host='localhost', port=12345, app=app, threaded=True)
     t = threading.Thread(target=srv.serve_forever)
     t.start()
-    yield f"http://{srv.host}:{srv.port}"
+    yield f'http://{srv.host}:{srv.port}'
     srv.shutdown()
     t.join()
