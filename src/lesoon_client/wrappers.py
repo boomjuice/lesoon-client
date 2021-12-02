@@ -1,5 +1,6 @@
 import json
 import os
+import typing as t
 
 import requests
 
@@ -7,16 +8,11 @@ from lesoon_client.base import BaseClient
 
 try:
     from lesoon_common import ResponseCode
-    from lesoon_common.dataclass.req import PageParam
     from lesoon_common.globals import request
     from lesoon_common import ServiceError
-
+    from lesoon_common.dataclass.req import PageParam
 except ImportError:
-    print('无法从lesoon-common导入模块,请检查是否已安装lesoon-common')
-    ResponseCode = None
-    PageParam = None
-    request = None
-    ServiceError = None
+    raise ImportError('无法从lesoon-common导入模块,请检查是否已安装lesoon-common')
 
 
 class LesoonClient(BaseClient):
@@ -45,34 +41,34 @@ class LesoonClient(BaseClient):
     @staticmethod
     def inherit_custom_headers(kwargs):
         """ 从headers继承自定义的key-value."""
-        if 'user-speciality' in request.headers.keys():
+        from flask.ctx import has_request_context
+        if has_request_context() and 'user-speciality' in request.headers.keys(
+        ):
             kwargs['headers']['user-speciality'] = request.headers.get(
                 'user-speciality')
 
     def inherit_trace_headers(self, kwargs):
         """ 从headers继承链路跟踪的key-value."""
-
-        # B3规范请求头
         try:
             from opentracing.propagation import Format
             from opentracing_instrumentation.request_context import get_current_span
             from flask.ctx import has_request_context
             from flask.globals import current_app
-            if (has_request_context() and
-                    'link_tracer' in current_app.extensions):
+            if has_request_context(
+            ) and 'link_tracer' in current_app.extensions:
+                # opentracing-B3规范请求头
                 link_tracer = current_app.extensions['link_tracer']
                 link_tracer.tracer.inject(
                     span_context=link_tracer.get_span().context,
                     format=Format.HTTP_HEADERS,
                     carrier=kwargs['headers'])
+                # istio规范请求头
+                incoming_header_keys = ['x-request-id', 'x-ot-span-context']
+                for key in incoming_header_keys:
+                    if value := request.headers.get(key):
+                        kwargs['headers'][key] = value
         except Exception as e:
             self.log.warning(f'拷贝链路跟踪请求头异常:{e}')
-
-        # istio规范请求头
-        incoming_header_keys = ['x-request-id', 'x-ot-span-context']
-        for key in incoming_header_keys:
-            if value := request.headers.get(key):
-                kwargs['headers'][key] = value
 
     def check_base_url(self):
         """
@@ -176,22 +172,70 @@ class LesoonClient(BaseClient):
                 silent: 是否异常静默
                 其余参数见父类注释
         """
-        from lesoon_common import Response as LesoonResponse
-
         silent = kwargs.pop('silent', False)
         result = super()._handle_result(res, method, request_url, **kwargs)
+        try:
+            if kwargs.get('load_response', False):
+                return self.load_response(result, method, request_url, **kwargs)
+            else:
+                return result
+        except Exception:
+            if not silent:
+                raise
+        else:
+            return result
 
+    def load_response(self, result: t.Any, method: str, request_url: str,
+                      **kwargs):
         if isinstance(result, dict) and 'flag' in result:
+            from lesoon_common import Response as LesoonResponse
             resp = LesoonResponse.load(result)
-            if resp.code != ResponseCode.Success.code and not silent:
+            if resp.code != ResponseCode.Success.code:
                 self.log.error(f'\n【请求地址】: {method.upper()} {request_url}' +
                                f'\n【异常信息】：{resp.flag}' + f'\n【请求参数】：{kwargs}')
                 raise ServiceError(code=ResponseCode.RemoteCallError)
             return resp
         else:
-            return result
+            raise ServiceError(
+                code=ResponseCode.RemoteCallError,
+                msg=f'初始化Response对象异常:{result}')
 
-    def python_page_get(
+    def _page_get(
+        self,
+        rule: str,
+        page_param: PageParam,
+        **kwargs,
+    ):
+        """
+        分页查询
+        Args:
+            rule: 资源路径
+            page_param: 分页相关参数
+            kwargs: 参考 :func:`lesoonClient._request`
+        Returns:
+            `lesoon_common.Response`
+        """
+        raise NotImplementedError()
+
+    def create(self, data: dict):
+        raise NotImplementedError()
+
+    def create_many(self, data_list: t.List[dict]):
+        raise NotImplementedError()
+
+    def update(self, data: dict):
+        raise NotImplementedError()
+
+    def update_many(self, data_list: t.List[dict]):
+        raise NotImplementedError()
+
+    def remove_many(self, ids: t.List[str]):
+        raise NotImplementedError()
+
+
+class PythonClient(LesoonClient):
+
+    def _page_get(
         self,
         rule: str,
         page_param: PageParam,
@@ -219,9 +263,35 @@ class LesoonClient(BaseClient):
                 'pageSize': page_param.page_size
             })
 
+        kwargs.setdefault('load_response', True)
         return self.GET(rule=rule, **kwargs)
 
-    def java_page_get(
+    def page_get(
+        self,
+        page_param: PageParam,
+        **kwargs,
+    ):
+        return self._page_get(rule='', page_param=page_param, **kwargs)
+
+    def create(self, data: dict):
+        return self.POST('', json=data)
+
+    def create_many(self, data_list: t.List[dict]):
+        return self.POST('', json=data_list)
+
+    def update(self, data: dict):
+        return self.PUT('', json=data)
+
+    def update_many(self, data_list: t.List[dict]):
+        return self.PUT('', json=data_list)
+
+    def remove_many(self, ids: t.List[str]):
+        return self.DELETE('', json=ids)
+
+
+class JavaClient(LesoonClient):
+
+    def _page_get(
         self,
         rule: str,
         page_param: PageParam,
@@ -253,4 +323,27 @@ class LesoonClient(BaseClient):
             kwargs['params'].update(
                 {f'search.{k}': v for k, v in page_param.where.items()})
 
+        kwargs.setdefault('load_response', True)
         return self.GET(rule=rule, **kwargs)
+
+    def page_get(
+        self,
+        page_param: PageParam,
+        **kwargs,
+    ):
+        return self._page_get(rule='/page', page_param=page_param, **kwargs)
+
+    def create(self, data: dict):
+        return self.POST('', json=data)
+
+    def create_many(self, data_list: t.List[dict]):
+        return self.POST('/batch', json=data_list)
+
+    def update(self, data: dict):
+        return self.PUT('', json=data)
+
+    def update_many(self, data_list: t.List[dict]):
+        return self.PUT('/batch', json=data_list)
+
+    def remove_many(self, ids: t.List[str]):
+        return self.DELETE('/unlimited/batch', json=ids)
