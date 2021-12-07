@@ -172,7 +172,6 @@ class LesoonClient(BaseClient):
                 silent: 是否异常静默
                 其余参数见父类注释
         """
-        silent = kwargs.pop('silent', False)
         result = super()._handle_result(res, method, request_url, **kwargs)
         try:
             if kwargs.get('load_response', False):
@@ -180,10 +179,10 @@ class LesoonClient(BaseClient):
             else:
                 return result
         except Exception:
-            if not silent:
+            if not kwargs.pop('silent', False):
                 raise
-        else:
-            return result
+            else:
+                return result
 
     def load_response(self, result: t.Any, method: str, request_url: str,
                       **kwargs):
@@ -263,8 +262,7 @@ class PythonClient(LesoonClient):
                 'pageSize': page_param.page_size
             })
 
-        kwargs.setdefault('load_response', True)
-        return self.GET(rule=rule, **kwargs)
+        return self.GET(rule=rule, load_response=True, **kwargs)
 
     def page_get(
         self,
@@ -274,19 +272,19 @@ class PythonClient(LesoonClient):
         return self._page_get(rule='', page_param=page_param, **kwargs)
 
     def create(self, data: dict):
-        return self.POST('', json=data)
+        return self.POST('', json=data, load_response=True)
 
     def create_many(self, data_list: t.List[dict]):
-        return self.POST('', json=data_list)
+        return self.POST('', json=data_list, load_response=True)
 
     def update(self, data: dict):
-        return self.PUT('', json=data)
+        return self.PUT('', json=data, load_response=True)
 
     def update_many(self, data_list: t.List[dict]):
-        return self.PUT('', json=data_list)
+        return self.PUT('', json=data_list, load_response=True)
 
     def remove_many(self, ids: t.List[str]):
-        return self.DELETE('', json=ids)
+        return self.DELETE('', json=ids, load_response=True)
 
 
 class JavaClient(LesoonClient):
@@ -323,8 +321,7 @@ class JavaClient(LesoonClient):
             kwargs['params'].update(
                 {f'search.{k}': v for k, v in page_param.where.items()})
 
-        kwargs.setdefault('load_response', True)
-        return self.GET(rule=rule, **kwargs)
+        return self.GET(rule=rule, load_response=True, **kwargs)
 
     def page_get(
         self,
@@ -334,16 +331,16 @@ class JavaClient(LesoonClient):
         return self._page_get(rule='/page', page_param=page_param, **kwargs)
 
     def create(self, data: dict):
-        return self.POST('', json=data)
+        return self.POST('', json=data, load_response=True)
 
     def create_many(self, data_list: t.List[dict]):
-        return self.POST('/batch', json=data_list)
+        return self.POST('/batch', json=data_list, load_response=True)
 
     def update(self, data: dict):
-        return self.PUT('', json=data)
+        return self.PUT('', json=data, load_response=True)
 
     def update_many(self, data_list: t.List[dict]):
-        return self.PUT('/batch', json=data_list)
+        return self.PUT('/batch', json=data_list, load_response=True)
 
     def remove_many(self, ids: t.List[str]):
-        return self.DELETE('/unlimited/batch', json=ids)
+        return self.DELETE('/unlimited/batch', json=ids, load_response=True)

@@ -1,29 +1,31 @@
 import typing as t
 
-from lesoon_client.wrappers import LesoonClient
+from lesoon_client.wrappers import JavaClient
 
 
-class IdCenterClient(LesoonClient):
+class IdCenterClient(JavaClient):
     URL_PREFIX = '/petrel/lesoon-id-center-api'
+
+    MODULE_NAME = '/generatorApi'
 
     def ui(self, biz_type: str):
         """获取自增ID."""
         params = {'bizType': biz_type}
-        return self.GET('/generatorApi/segment/id', params=params)
+        return self.GET('/segment/id', params=params)
 
     def batch_get_segment_id(self, biz_type: str, count: int):
         """批量获取自增ID."""
         params = {'bizType': biz_type, 'count': count}
-        return self.GET('/generatorApi/batch/segment/id', params=params)
+        return self.GET('/batch/segment/id', params=params)
 
     def get_uid(self):
         """获取UID."""
-        return self.GET('/generatorApi/uid')
+        return self.GET('/uid')
 
     def batch_get_uid(self, count: int):
         """批量获取UID."""
         params = {'count': count}
-        return self.GET('/generatorApi/batch/uid', params=params)
+        return self.GET('/batch/uid', params=params)
 
     def get_serial_no(self,
                       company_id: str,
@@ -35,7 +37,7 @@ class IdCenterClient(LesoonClient):
             'codeRuleNo': code_rule_no,
             'dynamicValue': dynamic_value,
         }
-        return self.GET('/generatorApi/code/no', params=params)
+        return self.GET('/code/no', params=params)
 
     def batch_get_serial_no(
         self,
@@ -51,4 +53,4 @@ class IdCenterClient(LesoonClient):
             'num': num,
             'dynamicValue': dynamic_value,
         }
-        return self.GET('/generatorApi/batch/code/no', params=params)
+        return self.GET('/batch/code/no', params=params)
