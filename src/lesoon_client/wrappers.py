@@ -192,7 +192,8 @@ class LesoonClient(BaseClient):
             if resp.code != ResponseCode.Success.code:
                 self.log.error(f'\n【请求地址】: {method.upper()} {request_url}' +
                                f'\n【异常信息】：{resp.flag}' + f'\n【请求参数】：{kwargs}')
-                raise ServiceError(code=ResponseCode.RemoteCallError)
+                raise ServiceError(
+                    code=ResponseCode.RemoteCallError, msg=resp.msg)
             return resp
         else:
             raise ServiceError(
@@ -228,7 +229,7 @@ class LesoonClient(BaseClient):
     def update_many(self, data_list: t.List[dict]):
         raise NotImplementedError()
 
-    def remove_many(self, ids: t.List[str]):
+    def remove_many(self, ids: t.List[t.Union[str, int]]):
         raise NotImplementedError()
 
 
@@ -283,7 +284,7 @@ class PythonClient(LesoonClient):
     def update_many(self, data_list: t.List[dict]):
         return self.PUT('', json=data_list, load_response=True)
 
-    def remove_many(self, ids: t.List[str]):
+    def remove_many(self, ids: t.List[t.Union[str, int]]):
         return self.DELETE('', json=ids, load_response=True)
 
 
@@ -342,5 +343,5 @@ class JavaClient(LesoonClient):
     def update_many(self, data_list: t.List[dict]):
         return self.PUT('/batch', json=data_list, load_response=True)
 
-    def remove_many(self, ids: t.List[str]):
+    def remove_many(self, ids: t.List[t.Union[str, int]]):
         return self.DELETE('/unlimited/batch', json=ids, load_response=True)

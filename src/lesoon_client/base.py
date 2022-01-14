@@ -15,7 +15,7 @@ class BaseClient:
     注意：本基类不做任何异常处理，异常处理需子类实现.
     Attributes:
         base_url: 域名,默认为cls.BASE_URL
-
+        url_prefix: url前缀
     """
     BASE_URL: str = ''
 
@@ -34,8 +34,11 @@ class BaseClient:
                 self._log.addHandler(self.logger_handler)
         return self._log
 
-    def __init__(self, base_url: t.Optional[str] = None):
+    def __init__(self,
+                 base_url: t.Optional[str] = None,
+                 url_prefix: t.Optional[str] = None):
         self.base_url = base_url or self.BASE_URL
+        self.url_prefix = url_prefix or self.URL_PREFIX
         self._log = None
         self.logger_handler = logging.StreamHandler()
 
@@ -56,7 +59,7 @@ class BaseClient:
         Returns:
             url_prefix + rule
         """
-        url_prefix = kwargs.pop('url_prefix', self.URL_PREFIX)
+        url_prefix = kwargs.pop('url_prefix', self.url_prefix)
         if not rule.startswith(url_prefix):
             url = (url_prefix + rule).replace('//', '/')
         else:
@@ -69,7 +72,6 @@ class BaseClient:
 
         base_url = kwargs.pop('base_url', self.base_url)
         request_url = parse.urljoin(base_url, uri)
-
         return self._request(method, request_url, **kwargs)
 
     def _request(
