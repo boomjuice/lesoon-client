@@ -183,7 +183,7 @@ class LesoonClient(BaseClient):
             if not kwargs.pop('silent', False):
                 raise
             else:
-                return LesoonResponse(result=result)
+                return LesoonResponse(result=result, code=ResponseCode.Success)
 
     def load_response(self, result: t.Any, method: str, request_url: str,
                       **kwargs):
