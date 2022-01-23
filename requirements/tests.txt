@@ -1,5 +1,5 @@
 -r core.txt
-lesoon-common==0.0.1
+lesoon-common==0.0.2
 mypy>=0.910
 
 pytest>=6.2.4

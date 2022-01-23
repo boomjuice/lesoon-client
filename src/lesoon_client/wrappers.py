@@ -11,6 +11,7 @@ try:
     from lesoon_common.globals import request
     from lesoon_common import ServiceError
     from lesoon_common.dataclass.req import PageParam
+    from lesoon_common import Response as LesoonResponse
 except ImportError:
     raise ImportError('无法从lesoon-common导入模块,请检查是否已安装lesoon-common')
 
@@ -174,7 +175,7 @@ class LesoonClient(BaseClient):
         """
         result = super()._handle_result(res, method, request_url, **kwargs)
         try:
-            if kwargs.get('load_response', False):
+            if kwargs.pop('load_response', True):
                 return self.load_response(result, method, request_url, **kwargs)
             else:
                 return result
@@ -182,12 +183,11 @@ class LesoonClient(BaseClient):
             if not kwargs.pop('silent', False):
                 raise
             else:
-                return result
+                return LesoonResponse(result=result)
 
     def load_response(self, result: t.Any, method: str, request_url: str,
                       **kwargs):
         if isinstance(result, dict) and 'flag' in result:
-            from lesoon_common import Response as LesoonResponse
             resp = LesoonResponse.load(result)
             if resp.code != ResponseCode.Success.code:
                 self.log.error(f'\n【请求地址】: {method.upper()} {request_url}' +

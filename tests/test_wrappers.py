@@ -24,9 +24,17 @@ class TestLesoonClient:
     def setup_class(cls, server):
         cls.client = SimpleClient(base_url=server)
 
+    def test_load_response(self):
+        resp = self.client.GET('/standard')
+        assert resp.code == ResponseCode.Success.code
+
+    def test_invalid_response(self):
+        with pytest.raises(ServiceError):
+            self.client.GET('/')
+
     def test_custom_headers(self):
         headers = {'user-speciality': 'userId=111'}
-        resp = self.client.GET('/', headers=headers)
+        resp = self.client.GET('/', headers=headers, load_response=False)
         assert resp['headers'].get(
             'user-speciality') == headers['user-speciality']
 
@@ -37,7 +45,7 @@ class TestLesoonClient:
             'X-B3-SpanId': '3d18c271eaf03bfa',
             'X-B3-Sampled': '1'
         }
-        resp = self.client.GET('/', headers=trace_headers)
+        resp = self.client.GET('/', headers=trace_headers, load_response=False)
         assert all([
             trace_key.lower() in resp['headers']
             for trace_key in trace_headers.keys()

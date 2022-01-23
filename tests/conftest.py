@@ -4,6 +4,7 @@ import threading
 
 import pytest
 from examples.config import Config
+from lesoon_common import success_response
 from werkzeug.serving import make_server
 
 
@@ -41,6 +42,10 @@ def view(app):
                 'data': request.get_json(silent=True),
                 'headers': dict(request.headers.items(lower=True))
             }
+
+        @route('/standard', methods=['GET'])
+        def standard(self):
+            return success_response()
 
         @route('/httpException', methods=['GET'])
         def raise_http_exception(self):
