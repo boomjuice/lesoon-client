@@ -32,6 +32,11 @@ class TestLesoonClient:
         with pytest.raises(ServiceError):
             self.client.GET('/')
 
+    def test_silent_invalid_response(self):
+        resp: Response = self.client.GET('/', silent=True)
+        assert resp.code == ResponseCode.Success.code
+        assert resp.result['method'] == 'GET'
+
     def test_custom_headers(self):
         headers = {'user-speciality': 'userId=111'}
         resp = self.client.GET('/', headers=headers, load_response=False)

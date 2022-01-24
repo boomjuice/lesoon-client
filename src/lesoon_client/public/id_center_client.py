@@ -8,7 +8,7 @@ class IdCenterClient(JavaClient):
 
     MODULE_NAME = '/generatorApi'
 
-    def ui(self, biz_type: str):
+    def uid(self, biz_type: str):
         """获取自增ID."""
         params = {'bizType': biz_type}
         return self.GET('/segment/id', params=params)
