@@ -4,7 +4,7 @@ from lesoon_client.wrappers import JavaClient
 
 
 class IdCenterClient(JavaClient):
-    URL_PREFIX = '/petrel/lesoon-id-center-api'
+    URL_PREFIX = '/lesoon-id-center-api'
 
     MODULE_NAME = '/generatorApi'
 

@@ -30,14 +30,15 @@ class LesoonClient(BaseClient):
 
     @staticmethod
     def set_token(kwargs):
-        from lesoon_common.utils.jwt import create_system_token
+        from lesoon_common.utils.jwt import create_token
+        from lesoon_common.dataclass.user import TokenUser
         # 请求token
         token = ''
         try:
             token = request.token
         except RuntimeError:
             pass
-        kwargs['headers']['token'] = token or create_system_token()
+        kwargs['headers']['token'] = token or create_token(TokenUser.new())
 
     @staticmethod
     def inherit_custom_headers(kwargs):

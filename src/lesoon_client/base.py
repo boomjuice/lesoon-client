@@ -71,7 +71,7 @@ class BaseClient:
         self._handle_pre_request(method, uri, kwargs)
 
         base_url = kwargs.pop('base_url', self.base_url)
-        request_url = parse.urljoin(base_url, uri)
+        request_url = base_url + uri
         return self._request(method, request_url, **kwargs)
 
     def _request(
