@@ -4,4 +4,4 @@ from lesoon_client.wrappers import JavaClient
 from lesoon_client.wrappers import LesoonClient
 from lesoon_client.wrappers import PythonClient
 
-__version__ = '0.0.1'
+__version__ = '0.0.2'

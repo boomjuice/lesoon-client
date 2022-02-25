@@ -1,47 +1,47 @@
-from config import DevelopmentConfig
-from flask import blueprints
-from lesoon_common import LesoonApi
+from config import Config
 from lesoon_common import LesoonFlask
-from lesoon_common import LesoonView
-from lesoon_common import request_param
-from lesoon_common import route
+from lesoon_restful import Api
+from lesoon_restful import Resource
+from lesoon_restful import Route
+from lesoon_restful import use_kwargs
+from lesoon_restful import web_fields as wf
 
 from lesoon_client.wrappers import LesoonClient
 
-app = LesoonFlask(config=DevelopmentConfig)
-
-bp = blueprints.Blueprint('lesoon_client', __name__)
-
-api = LesoonApi(bp)
+app = LesoonFlask(config=Config)
+api = Api(app)
 
 
 class SimpleClient(LesoonClient):
-    BASE_HOST = 'http://127.0.0.1'
+    BASE_URL = 'http://localhost:12345'
     URL_PREFIX = '/simple'
 
     def get_test(self, text: str):
-        return self.get('/test', params={'text': text})
+        return self.GET('/test', params={'text': text}, load_response=False)
 
 
-class SimpleView(LesoonView):
+class SimpleResource(Resource):
+
+    class Meta:
+        name = 'simple'
+
     simple_client = SimpleClient()
 
-    @route('/test', methods=['GET'])
-    @request_param()
+    @Route.GET('/test')
+    @use_kwargs({'text': wf.Str()}, location='query')
     def test(self, text: str):
         return f'echo :{text}'
 
-    @route('/testClient', methods=['GET'], skip_decorator=True)
-    @request_param()
+    @Route.GET('/testClient')
+    @use_kwargs({'text': wf.Str()}, location='query')
     def test_client(self, text: str):
         res = self.simple_client.get_test(text)
         return res
 
 
-api.register_view(SimpleView, '/simple', endpoint='simple')
+api.add_resource(SimpleResource)
 
 if __name__ == '__main__':
-    app.register_blueprint(bp)
     print(app.url_map)
     app.run(port=12345, debug=True)
     # res = requests.get("http://localhost:12345/simple/testClient?text=client_test")

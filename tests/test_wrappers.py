@@ -8,10 +8,11 @@ from lesoon_client import LesoonClient
 
 class SimpleClient(LesoonClient):
     BASE_URL = ''
+    PROVIDER = 'simple'
     URL_PREFIX = '/simple'
 
-    def _handle_pre_request(self, method: str, uri: str, kwargs: dict):
-        super(LesoonClient, self)._handle_pre_request(method, uri, kwargs)
+    def _handle_pre_request(self, method: str, kwargs: dict):
+        super(LesoonClient, self)._handle_pre_request(method, kwargs)
         self.inherit_custom_headers(kwargs)
         self.inherit_trace_headers(kwargs)
 
@@ -65,3 +66,22 @@ class TestLesoonClient:
         r = Response.load(r)
         assert r.code == ResponseCode.Success.code
         assert r.msg == '系统繁忙,请稍后重试'
+
+    def test_base_url_config(self, app, server):
+        app.config['CLIENT'] = {'BASE_URL': server}
+        self.client = SimpleClient()
+        self.client.init_app(app)
+        resp = self.client.GET('/standard')
+        assert resp.code == ResponseCode.Success.code
+
+    def test_provider_config(self, app, server):
+        app.config['CLIENT'] = {
+            'BASE_URL': '',
+            'PROVIDER_URLS': {
+                'simple': f'{server}/simple'
+            }
+        }
+        self.client = SimpleClient()
+        self.client.init_app(app)
+        resp = self.client.GET('/standard')
+        assert resp.code == ResponseCode.Success.code

@@ -3,35 +3,71 @@ import os
 import typing as t
 
 import requests
+from flask.logging import default_handler
+from lesoon_common import LesoonFlask
+from lesoon_common import Response as LesoonResponse
+from lesoon_common import ResponseCode
+from lesoon_common import success_response
+from lesoon_common.ctx import has_app_context
+from lesoon_common.ctx import has_request_context
+from lesoon_common.dataclass.req import PageParam
+from lesoon_common.dataclass.user import TokenUser
+from lesoon_common.exceptions import ServiceError
+from lesoon_common.globals import current_app
+from lesoon_common.globals import current_user
+from lesoon_common.globals import request
+from lesoon_common.utils.jwt import create_token
+from opentracing.propagation import Format
+from opentracing_instrumentation.request_context import get_current_span
+from werkzeug.exceptions import ServiceUnavailable
 
 from lesoon_client.base import BaseClient
 
-try:
-    from lesoon_common import ResponseCode
-    from lesoon_common.globals import request
-    from lesoon_common import ServiceError
-    from lesoon_common.dataclass.req import PageParam
-    from lesoon_common import Response as LesoonResponse
-except ImportError:
-    raise ImportError('无法从lesoon-common导入模块,请检查是否已安装lesoon-common')
-
 
 class LesoonClient(BaseClient):
-    BASE_URL = os.environ.get('BASE_URL', '')
+    """
+    Lesoon体系Python调用客户端基类.
 
-    MODULE_NAME = ''
+    """
+    # 提供方名称
+    PROVIDER: str = ''
+
+    # 模块名
+    MODULE_NAME: str = ''
 
     def __init__(self, *args, **kwargs):
-        from flask.logging import default_handler
-
         super().__init__(*args, **kwargs)
+        self.provider = kwargs.pop('provider', '') or self.PROVIDER
+        self.module_name = kwargs.pop('module_name', '') or self.MODULE_NAME
 
+    def init_app(self, app: LesoonFlask):
+        """
+        初始化client配置
+        支持自定义client.uri_prefix
+        Args:
+            app: LesoonFlask
+
+        """
         self.logger_handler = default_handler
+        current_app.config.setdefault('CLIENT', self._default_config())
+        client_config = current_app.config['CLIENT']
+        provider_urls = client_config.get('PROVIDER_URLS', {})
+
+        if self.provider in provider_urls:
+            self.base_url, self.url_prefix = provider_urls[self.provider], ''
+        else:
+            self.base_url = client_config['BASE_URL'] or self.base_url
+
+        if 'lesoon-client' not in current_app.extensions:
+            current_app.extensions['lesoon-client'] = {}
+        current_app.extensions['lesoon-client'][self.provider] = self
+
+    @staticmethod
+    def _default_config() -> dict:
+        return {'BASE_URL': '', 'PROVIDER_URLS': {}}
 
     @staticmethod
     def set_token(kwargs):
-        from lesoon_common.utils.jwt import create_token
-        from lesoon_common.dataclass.user import TokenUser
         # 请求token
         token = ''
         try:
@@ -43,7 +79,6 @@ class LesoonClient(BaseClient):
     @staticmethod
     def inherit_custom_headers(kwargs):
         """ 从headers继承自定义的key-value."""
-        from flask.ctx import has_request_context
         if has_request_context() and 'user-speciality' in request.headers.keys(
         ):
             kwargs['headers']['user-speciality'] = request.headers.get(
@@ -52,10 +87,6 @@ class LesoonClient(BaseClient):
     def inherit_trace_headers(self, kwargs):
         """ 从headers继承链路跟踪的key-value."""
         try:
-            from opentracing.propagation import Format
-            from opentracing_instrumentation.request_context import get_current_span
-            from flask.ctx import has_request_context
-            from flask.globals import current_app
             if has_request_context(
             ) and 'link_tracer' in current_app.extensions:
                 # opentracing-B3规范请求头
@@ -72,23 +103,7 @@ class LesoonClient(BaseClient):
         except Exception as e:
             self.log.warning(f'拷贝链路跟踪请求头异常:{e}')
 
-    def check_base_url(self):
-        """
-        检查base_url是否有值.
-        self.base_url为空时, 如果此时在应用内则取取应用配置
-        """
-        if self.base_url:
-            return
-        else:
-            from flask.ctx import has_app_context
-            from flask.globals import current_app
-            if has_app_context() and current_app.config.get('BASE_URL'):
-                # 如果是在应用内调用则直接取配置
-                self.base_url = current_app.config['BASE_URL']
-            else:
-                raise RuntimeError('Client调用缺少BASE_URL参数,请检查相关配置')
-
-    def _handle_pre_request(self, method: str, uri: str, kwargs: dict):
+    def _handle_pre_request(self, method: str, kwargs: dict):
         """
         请求前预处理.
         处理主要包括: 1.检查base_url
@@ -100,29 +115,16 @@ class LesoonClient(BaseClient):
             kwargs:
 
         """
-        super()._handle_pre_request(method, uri, kwargs)
-        self.check_base_url()
-        self.set_token(kwargs)
+        super()._handle_pre_request(method, kwargs)
+        if has_app_context():
+            self.init_app(current_app)
+            if current_app.config.get('JWT_ENABLE', False):
+                self.set_token(kwargs)
         self.inherit_custom_headers(kwargs)
         self.inherit_trace_headers(kwargs)
 
-    def build_uri(self, rule: str, **kwargs) -> str:
-        """
-        拓展uri构建.
-        新增module_name参数,减少重复配置
-        real_uri = url_prefix + module_name + rule
-        Args:
-            rule:
-            **kwargs:
-
-        Returns:
-
-        """
-        url_prefix = kwargs.pop('url_prefix', self.URL_PREFIX)
-        module_name = kwargs.pop('module_name', self.MODULE_NAME)
-
-        uri = (url_prefix + module_name + rule).replace('//', '/')
-        return uri
+    def _build_uri_prefix(self, kwargs: dict):
+        return self.base_url + self.url_prefix + self.module_name
 
     def _request(
         self,
@@ -139,8 +141,6 @@ class LesoonClient(BaseClient):
             request_url: 请求url
 
         """
-        from werkzeug.exceptions import ServiceUnavailable
-        from lesoon_common import success_response
 
         try:
             result = super()._request(

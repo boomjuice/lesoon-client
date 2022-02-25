@@ -2,6 +2,7 @@
 import inspect
 import json
 import logging
+import re
 import typing as t
 from concurrent.futures import ThreadPoolExecutor
 from urllib import parse
@@ -42,36 +43,20 @@ class BaseClient:
         self._log = None
         self.logger_handler = logging.StreamHandler()
 
-    def _handle_pre_request(self, method: str, uri: str, kwargs: dict):
+    def _handle_pre_request(self, method: str, kwargs: dict):
         """ 请求前预处理."""
         if 'headers' not in kwargs:
             kwargs['headers'] = dict()
 
         kwargs['headers']['Content-Type'] = 'application/json'
 
-    def build_uri(self, rule: str, **kwargs):
-        """
-        构建请求uri.
-        Args:
-            rule: 资源路径
-            **kwargs:
-
-        Returns:
-            url_prefix + rule
-        """
-        url_prefix = kwargs.pop('url_prefix', self.url_prefix)
-        if not rule.startswith(url_prefix):
-            url = (url_prefix + rule).replace('//', '/')
-        else:
-            url = rule
-        return url
+    def _build_uri_prefix(self, kwargs: dict):
+        return self.base_url + self.url_prefix
 
     def request(self, method: str, rule: str, **kwargs):
-        uri = self.build_uri(rule=rule, **kwargs)
-        self._handle_pre_request(method, uri, kwargs)
-
-        base_url = kwargs.pop('base_url', self.base_url)
-        request_url = base_url + uri
+        self._handle_pre_request(method, kwargs)
+        uri_prefix = self._build_uri_prefix(kwargs)
+        request_url = re.sub(r'(?<!:)//', '/', uri_prefix + rule)
         return self._request(method, request_url, **kwargs)
 
     def _request(
