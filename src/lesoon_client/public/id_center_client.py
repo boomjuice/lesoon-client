@@ -4,6 +4,8 @@ from lesoon_client.wrappers import JavaClient
 
 
 class IdCenterClient(JavaClient):
+    PROVIDER = 'lesoon-id-center-api'
+
     URL_PREFIX = '/lesoon-id-center-api'
 
     MODULE_NAME = '/generatorApi'

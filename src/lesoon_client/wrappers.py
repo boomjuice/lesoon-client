@@ -277,13 +277,13 @@ class PythonClient(LesoonClient):
         return self.POST('', json=data, load_response=True)
 
     def create_many(self, data_list: t.List[dict]):
-        return self.POST('', json=data_list, load_response=True)
+        return self.POST('/batch', json=data_list, load_response=True)
 
     def update(self, data: dict):
         return self.PUT('', json=data, load_response=True)
 
     def update_many(self, data_list: t.List[dict]):
-        return self.PUT('', json=data_list, load_response=True)
+        return self.PUT('/batch', json=data_list, load_response=True)
 
     def remove_many(self, ids: t.List[t.Union[str, int]]):
         return self.DELETE('', json=ids, load_response=True)
@@ -298,7 +298,7 @@ class JavaClient(LesoonClient):
         request_url: str,
         **kwargs,
     ):
-        kwargs['silent'] = True
+        kwargs['silent'] = kwargs.pop('silent', True)
         return super()._handle_result(res, method, request_url, **kwargs)
 
     def _page_get(
