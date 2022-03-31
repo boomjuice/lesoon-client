@@ -1,9 +1,9 @@
 import typing as t
 
-from lesoon_client.wrappers import Java3Client
+from lesoon_client.wrappers import Java2Client
 
 
-class IdCenterClient(Java3Client):
+class IdCenterClient(Java2Client):
     PROVIDER = 'lesoon-id-center-api'
 
     URL_PREFIX = '/lesoon-id-center-api'
