@@ -4,8 +4,9 @@ import typing as t
 
 import requests
 from flask.logging import default_handler
+from lesoon_common import ClientResponse
 from lesoon_common import LesoonFlask
-from lesoon_common import Response as LesoonResponse
+from lesoon_common import Response
 from lesoon_common import ResponseCode
 from lesoon_common import success_response
 from lesoon_common.ctx import has_app_context
@@ -16,6 +17,7 @@ from lesoon_common.exceptions import ServiceError
 from lesoon_common.globals import current_app
 from lesoon_common.globals import current_user
 from lesoon_common.globals import request
+from lesoon_common.response import ResponseBase
 from lesoon_common.utils.jwt import create_token
 from opentracing.propagation import Format
 from opentracing_instrumentation.request_context import get_current_span
@@ -35,10 +37,15 @@ class LesoonClient(BaseClient):
     # 模块名
     MODULE_NAME: str = ''
 
+    # Response类
+    RESPONSE_CLS: t.Type[ResponseBase] = ClientResponse
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.provider = kwargs.pop('provider', '') or self.PROVIDER
         self.module_name = kwargs.pop('module_name', '') or self.MODULE_NAME
+        self.response_class = kwargs.pop('response_cls',
+                                         '') or self.RESPONSE_CLS
 
     def init_app(self, app: LesoonFlask):
         """
@@ -184,12 +191,13 @@ class LesoonClient(BaseClient):
             if not kwargs.pop('silent', False):
                 raise
             else:
-                return LesoonResponse(code=ResponseCode.Success, result=result)
+                return self.response_class(
+                    code=ResponseCode.Success, result=result)
 
     def load_response(self, result: t.Any, method: str, request_url: str,
                       **kwargs):
         if isinstance(result, dict) and 'flag' in result:
-            resp = LesoonResponse.load(result)
+            resp = self.response_class.load(result)
             if resp.code != ResponseCode.Success.code:
                 self.log.error(f'\n【请求地址】: {method.upper()} {request_url}' +
                                f'\n【异常信息】：{resp.flag}' + f'\n【请求参数】：{kwargs}')
@@ -216,22 +224,30 @@ class LesoonClient(BaseClient):
         Returns:
             `lesoon_common.Response`
         """
-        raise NotImplementedError()
+        kwargs.setdefault('params', {})
+
+        kwargs['params'].update({
+            'page': page_param.page,
+            'pageSize': page_param.page_size,
+            'where': json.dumps(page_param.where),
+        })
+
+        return self.GET(rule=rule, **kwargs)
 
     def create(self, data: dict):
-        raise NotImplementedError()
+        return self.POST('', json=data)
 
     def create_many(self, data_list: t.List[dict]):
-        raise NotImplementedError()
+        return self.POST('/batch', json=data_list)
 
     def update(self, data: dict):
-        raise NotImplementedError()
+        return self.PUT('', json=data)
 
     def update_many(self, data_list: t.List[dict]):
-        raise NotImplementedError()
+        return self.PUT('/batch', json=data_list)
 
     def remove_many(self, ids: t.List[t.Union[str, int]]):
-        raise NotImplementedError()
+        return self.DELETE('', json=ids)
 
 
 class PythonClient(LesoonClient):
@@ -251,20 +267,12 @@ class PythonClient(LesoonClient):
         Returns:
             `lesoon_common.Response`
         """
-        if 'params' not in kwargs:
-            kwargs['params'] = {}
-
-        kwargs['params'].update({
-            'ifPage': int(page_param.if_page),
-            'where': json.dumps(page_param.where),
-        })
+        kwargs.setdefault('params', {})
         if page_param.if_page:
             kwargs['params'].update({
-                'page': page_param.page,
-                'pageSize': page_param.page_size
+                'ifPage': int(page_param.if_page),
             })
-
-        return self.GET(rule=rule, load_response=True, **kwargs)
+        return super()._page_get(rule=rule, page_param=page_param, **kwargs)
 
     def page_get(
         self,
@@ -273,23 +281,47 @@ class PythonClient(LesoonClient):
     ):
         return self._page_get(rule='', page_param=page_param, **kwargs)
 
-    def create(self, data: dict):
-        return self.POST('', json=data, load_response=True)
 
-    def create_many(self, data_list: t.List[dict]):
-        return self.POST('/batch', json=data_list, load_response=True)
+class Java3Client(LesoonClient):
 
-    def update(self, data: dict):
-        return self.PUT('', json=data, load_response=True)
+    def _page_get(
+        self,
+        rule: str,
+        page_param: PageParam,
+        **kwargs,
+    ):
+        """
+        java 体系分页查询
+        Args:
+            rule: 资源路径
+            page_param: 分页相关参数
+            kwargs: 参考 :func:`lesoonClient._request`
+        Returns:
+            `lesoon_common.Response`
 
-    def update_many(self, data_list: t.List[dict]):
-        return self.PUT('/batch', json=data_list, load_response=True)
+        """
+        kwargs.setdefault('params', {})
+
+        if not page_param.if_page:
+            # petrel体系中带page后缀为分页,反之不分页
+            rule = rule.replace('/page', '')
+
+        return super()._page_get(rule=rule, page_param=page_param, **kwargs)
+
+    def page_get(
+        self,
+        page_param: PageParam,
+        **kwargs,
+    ):
+        return self._page_get(rule='/page', page_param=page_param, **kwargs)
 
     def remove_many(self, ids: t.List[t.Union[str, int]]):
-        return self.DELETE('', json=ids, load_response=True)
+        return self.DELETE('/unlimited/batch', json=ids, load_response=True)
 
 
-class JavaClient(LesoonClient):
+class Java2Client(Java3Client):
+
+    RESPONSE_CLS = Response
 
     def _handle_result(
         self,
@@ -317,8 +349,7 @@ class JavaClient(LesoonClient):
             `lesoon_common.Response`
 
         """
-        if 'params' not in kwargs:
-            kwargs['params'] = {}
+        kwargs.setdefault('params', {})
 
         if not page_param.if_page:
             # petrel体系中带page后缀为分页,反之不分页
@@ -333,26 +364,4 @@ class JavaClient(LesoonClient):
             kwargs['params'].update(
                 {f'search.{k}': v for k, v in page_param.where.items()})
 
-        return self.GET(rule=rule, load_response=True, **kwargs)
-
-    def page_get(
-        self,
-        page_param: PageParam,
-        **kwargs,
-    ):
-        return self._page_get(rule='/page', page_param=page_param, **kwargs)
-
-    def create(self, data: dict):
-        return self.POST('', json=data, load_response=True)
-
-    def create_many(self, data_list: t.List[dict]):
-        return self.POST('/batch', json=data_list, load_response=True)
-
-    def update(self, data: dict):
-        return self.PUT('', json=data, load_response=True)
-
-    def update_many(self, data_list: t.List[dict]):
-        return self.PUT('/batch', json=data_list, load_response=True)
-
-    def remove_many(self, ids: t.List[t.Union[str, int]]):
-        return self.DELETE('/unlimited/batch', json=ids, load_response=True)
+        return self.GET(rule=rule, **kwargs)

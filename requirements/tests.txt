@@ -1,5 +1,5 @@
 -r core.txt
-lesoon-restful==0.0.2
+lesoon-restful>=0.0.2
 mypy>=0.910
 
 pytest>=6.2.4
