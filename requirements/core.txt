@@ -1,2 +1,2 @@
-lesoon-common==0.0.4
+lesoon-common>=0.0.4
 requests>=2.25.1
