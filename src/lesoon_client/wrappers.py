@@ -268,10 +268,9 @@ class PythonClient(LesoonClient):
             `lesoon_common.Response`
         """
         kwargs.setdefault('params', {})
-        if page_param.if_page:
-            kwargs['params'].update({
-                'ifPage': int(page_param.if_page),
-            })
+        kwargs['params'].update({
+            'ifPage': int(page_param.if_page),
+        })
         return super()._page_get(rule=rule, page_param=page_param, **kwargs)
 
     def page_get(
