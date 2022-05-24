@@ -50,10 +50,8 @@ class LesoonClient(BaseClient):
     def init_app(self, app: LesoonFlask):
         """
         初始化client配置
-        支持自定义client.uri_prefix
-        Args:
-            app: LesoonFlask
-
+        支持通过provioder指定不同的client使用不同的url_prefix
+        e.g.: {'PROVIDER_URLS':{'xxx-api':'http://locahost:5000'}}
         """
         self.logger_handler = default_handler
         current_app.config.setdefault('CLIENT', self._default_config())
@@ -64,6 +62,9 @@ class LesoonClient(BaseClient):
             self.base_url, self.url_prefix = provider_urls[self.provider], ''
         else:
             self.base_url = client_config['BASE_URL'] or self.base_url
+
+        if not self.base_url:
+            self.log.warning(f'Client中的{self.provider}调用路径为空，请检查相关配置')
 
         if 'lesoon-client' not in current_app.extensions:
             current_app.extensions['lesoon-client'] = {}
@@ -158,7 +159,8 @@ class LesoonClient(BaseClient):
             else:
                 self.log.error(f'\n【请求地址】: {method.upper()} {request_url}' +
                                f'\n【异常信息】：{e}' + f'\n【请求参数】：{kwargs}')
-                raise ServiceError(code=ResponseCode.RemoteCallError)
+                raise ServiceError(
+                    code=ResponseCode.RemoteCallError, msg_detail=str(e))
         return result
 
     def _handle_result(
@@ -319,7 +321,6 @@ class Java3Client(LesoonClient):
 
 
 class Java2Client(Java3Client):
-
     RESPONSE_CLS = Response
 
     def _handle_result(
