@@ -5,9 +5,9 @@ import logging
 import re
 import typing as t
 from concurrent.futures import ThreadPoolExecutor
-from urllib import parse
 
 import requests
+from lesoon_common.utils.base import AttributeDict
 
 
 class BaseClient:
@@ -99,7 +99,7 @@ class BaseClient:
     def _decode_result(self, res: requests.Response):
         """解析请求结果."""
         try:
-            res = res.json()
+            res = res.json(object_hook=AttributeDict)
         except json.JSONDecodeError:
             self.log.info('无法将调用结果解析为json', exc_info=True)
             res = res.text

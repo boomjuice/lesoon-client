@@ -1,5 +1,4 @@
 import json
-import os
 import typing as t
 
 import requests
@@ -15,12 +14,10 @@ from lesoon_common.dataclass.req import PageParam
 from lesoon_common.dataclass.user import TokenUser
 from lesoon_common.exceptions import ServiceError
 from lesoon_common.globals import current_app
-from lesoon_common.globals import current_user
 from lesoon_common.globals import request
 from lesoon_common.response import ResponseBase
 from lesoon_common.utils.jwt import create_token
 from opentracing.propagation import Format
-from opentracing_instrumentation.request_context import get_current_span
 from werkzeug.exceptions import ServiceUnavailable
 
 from lesoon_client.base import BaseClient
@@ -50,7 +47,7 @@ class LesoonClient(BaseClient):
     def init_app(self, app: LesoonFlask):
         """
         初始化client配置
-        支持通过provioder指定不同的client使用不同的url_prefix
+        支持通过provider指定不同的client使用不同的url_prefix
         e.g.: {'PROVIDER_URLS':{'xxx-api':'http://locahost:5000'}}
         """
         self.logger_handler = default_handler
@@ -119,7 +116,6 @@ class LesoonClient(BaseClient):
                      3.请求头的继承
         Args:
             method: 请求方法
-            uri: 请求uri(即请求资源)
             kwargs:
 
         """
@@ -189,9 +185,9 @@ class LesoonClient(BaseClient):
                 return self.load_response(result, method, request_url, **kwargs)
             else:
                 return result
-        except Exception:
+        except Exception as e:
             if not kwargs.pop('silent', False):
-                raise
+                raise e
             else:
                 return self.response_class(
                     code=ResponseCode.Success, result=result)
