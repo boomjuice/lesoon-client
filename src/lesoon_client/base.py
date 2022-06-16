@@ -73,7 +73,9 @@ class BaseClient:
             method: 请求方式 GET/POST/PUT/DELETE...
             request_url: 请求地址
             kwargs: 请求参数以及自定义拓展参数
-                    请求参数参考 :func:`requests.sessions.request`
+                    object_hook: 返回类型，用于做返回结果类型转换
+                    object_key_hook: 返回类型，用于做返回结果类型转换
+                    其余请求参数参考 :func:`requests.sessions.request`
 
         """
         # http.request函数签名所定义的参数
@@ -92,16 +94,36 @@ class BaseClient:
         result = self._handle_result(res, method, request_url, **kwargs)
 
         self.log.info(f'\n【请求地址】: {method.upper()} {request_url}'
-                      f'\n【请求参数】：{kwargs}'
+                      f'\n【请求参数】：{str(kwargs)[:100]}...'
                       f'\n【响应数据】：{result}')
         return result
 
-    def _decode_result(self, res: requests.Response):
-        """解析请求结果."""
+    def _decode_result(self,
+                       res: requests.Response,
+                       object_hook: t.Callable = None,
+                       object_key_hook: t.Dict[str, t.Callable] = None):
+        """
+        解析请求结果.
+
+        Args:
+            res: 请求结果
+            object_hook: 对象钩子
+            object_key_hook: 对象键值钩子
+
+        Returns:
+            res: 解析结果
+        """
+
         try:
-            res = res.json(object_hook=AttributeDict)
-        except json.JSONDecodeError:
-            self.log.info('无法将调用结果解析为json', exc_info=True)
+            res = res.json(object_hook=object_hook or AttributeDict)
+            if object_key_hook:
+                for k, func in object_key_hook.items():
+                    setattr(
+                        res, k,
+                        json.loads(
+                            json.dumps(getattr(res, k)), object_hook=func))
+        except Exception as e:
+            self.log.error(f'无法将调用结果转化为{object_hook}类型:{e}', exc_info=True)
             res = res.text
         return res
 
@@ -121,10 +143,13 @@ class BaseClient:
             method: 调用方法
             request_url: 请求url
             kwargs: 请求参数以及自定义拓展参数
+                    object_hook: 返回类型，用于做返回结果类型转换
                     请求参数参考 :func:`requests.sessions.request`
         """
         if not isinstance(res, dict):
-            result = self._decode_result(res)
+            object_hook = kwargs.get('object_hook', None)
+            object_key_hook = kwargs.get('object_key_hook', None)
+            result = self._decode_result(res, object_hook, object_key_hook)
         else:
             result = res
 

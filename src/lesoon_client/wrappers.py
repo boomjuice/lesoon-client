@@ -17,6 +17,7 @@ from lesoon_common.globals import current_app
 from lesoon_common.globals import request
 from lesoon_common.response import ResponseBase
 from lesoon_common.utils.jwt import create_token
+from lesoon_common.utils.jwt import get_token
 from opentracing.propagation import Format
 from werkzeug.exceptions import ServiceUnavailable
 
@@ -76,7 +77,7 @@ class LesoonClient(BaseClient):
         # 请求token
         token = ''
         try:
-            token = request.token
+            token = get_token()
         except RuntimeError:
             pass
         kwargs['headers']['token'] = token or create_token(TokenUser.new())
