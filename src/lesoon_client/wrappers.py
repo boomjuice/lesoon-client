@@ -155,7 +155,8 @@ class LesoonClient(BaseClient):
                 result = success_response(msg='系统繁忙,请稍后重试')
             else:
                 self.log.error(f'\n【请求地址】: {method.upper()} {request_url}' +
-                               f'\n【异常信息】：{e}' + f'\n【请求参数】：{kwargs}')
+                               f'\n【异常信息】：{e}' +
+                               f'\n【请求参数】：{str(kwargs)[:200]}...')
                 raise ServiceError(
                     code=ResponseCode.RemoteCallError, msg_detail=str(e))
         return result

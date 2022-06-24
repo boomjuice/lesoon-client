@@ -118,10 +118,10 @@ class BaseClient:
             res = res.json(object_hook=object_hook or AttributeDict)
             if object_key_hook:
                 for k, func in object_key_hook.items():
-                    setattr(
-                        res, k,
-                        json.loads(
-                            json.dumps(getattr(res, k)), object_hook=func))
+                    if hasattr(res, k):
+                        v = getattr(res, k)
+                        setattr(res, k,
+                                json.loads(json.dumps(v), object_hook=func))
         except Exception as e:
             self.log.error(f'无法将调用结果转化为{object_hook}类型:{e}', exc_info=True)
             res = res.text
