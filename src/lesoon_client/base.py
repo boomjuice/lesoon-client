@@ -95,7 +95,7 @@ class BaseClient:
 
         self.log.info(f'\n【请求地址】: {method.upper()} {request_url}'
                       f'\n【请求参数】：{str(kwargs)[:100]}...'
-                      f'\n【响应数据】：{result}')
+                      f'\n【响应数据】：{str(result)[:100]}...')
         return result
 
     def _decode_result(self,
