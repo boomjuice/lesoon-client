@@ -9,6 +9,7 @@ from lesoon_common import ResponseCode
 from lesoon_common import success_response
 from lesoon_common.ctx import has_app_context
 from lesoon_common.ctx import has_request_context
+from lesoon_common.dataclass.base import BaseDataClass
 from lesoon_common.dataclass.req import PageParam
 from lesoon_common.dataclass.user import TokenUser
 from lesoon_common.globals import current_app

@@ -117,11 +117,7 @@ class BaseClient:
                       f'\n【响应数据】：{str(result)[:100]}...')
         return result
 
-    def _decode_result(self,
-                       res: requests.Response,
-                       object_hook: t.Optional[t.Callable] = None,
-                       object_key_hook: t.Optional[t.Dict[str,
-                                                          t.Callable]] = None):
+    def _decode_result(self, res: requests.Response):
         """
         解析请求结果.
 
@@ -135,15 +131,9 @@ class BaseClient:
         """
 
         try:
-            res = res.json(object_hook=object_hook or AttributeDict)
-            if object_key_hook:
-                for k, func in object_key_hook.items():
-                    if hasattr(res, k):
-                        v = getattr(res, k)
-                        setattr(res, k,
-                                json.loads(json.dumps(v), object_hook=func))
+            res = res.json(object_hook=AttributeDict, strict=False)
         except (TypeError, ValueError) as e:
-            self.log.error(f'无法将调用结果转化为{object_hook}类型:{e}', exc_info=True)
+            self.log.error(f'无法将调用结果转化为json:{e}', exc_info=True)
             return res.text
         return res
 
@@ -167,13 +157,13 @@ class BaseClient:
                     请求参数参考 :func:`requests.sessions.request`
         """
         if not isinstance(res, dict):
-            object_hook = kwargs.get('object_hook', None)
-            object_key_hook = kwargs.get('object_key_hook', None)
-            result = self._decode_result(res, object_hook, object_key_hook)
+            result = self._decode_result(res)
         else:
             result = res
 
-        return result
+        result_processor = kwargs.pop('result_processor', None)
+
+        return result if not result_processor else result_processor(result)
 
     def GET(self, rule: str, **kwargs):
         return self.request('GET', rule, **kwargs)
