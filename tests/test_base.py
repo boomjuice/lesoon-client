@@ -1,9 +1,9 @@
 import json
 
 import pytest
-import requests
 
 from lesoon_client import BaseClient
+from lesoon_client.core.exceptions import ClientException
 
 
 class SimpleClient(BaseClient):
@@ -50,5 +50,5 @@ class TestBaseClient:
         assert resp['data'] == data
 
     def test_http_exception(self):
-        with pytest.raises(requests.exceptions.HTTPError):
+        with pytest.raises(ClientException):
             r = self.client.GET('/simple/httpException')

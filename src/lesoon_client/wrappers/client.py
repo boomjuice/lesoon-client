@@ -1,7 +1,6 @@
 import json
 import typing as t
 
-import requests
 from flask.logging import default_handler
 from lesoon_common import ClientResponse
 from lesoon_common import LesoonFlask
@@ -12,7 +11,6 @@ from lesoon_common.ctx import has_app_context
 from lesoon_common.ctx import has_request_context
 from lesoon_common.dataclass.req import PageParam
 from lesoon_common.dataclass.user import TokenUser
-from lesoon_common.exceptions import ServiceError
 from lesoon_common.globals import current_app
 from lesoon_common.globals import request
 from lesoon_common.response import ResponseBase
@@ -21,7 +19,9 @@ from lesoon_common.utils.jwt import get_token
 from opentracing.propagation import Format
 from werkzeug.exceptions import ServiceUnavailable
 
-from lesoon_client.base import BaseClient
+from lesoon_client.core.base import BaseClient
+from lesoon_client.core.exceptions import ClientException
+from lesoon_client.core.exceptions import RemoteCallError
 
 
 class LesoonClient(BaseClient):
@@ -131,12 +131,8 @@ class LesoonClient(BaseClient):
     def _build_uri_prefix(self, kwargs: dict):
         return self.base_url + self.url_prefix + self.module_name
 
-    def _request(
-        self,
-        method: str,
-        request_url: str,
-        **kwargs,
-    ):
+    def _handle_request_except(self, e: ClientException, func: t.Callable,
+                               *args, **kwargs):
         """
         发送请求调用.
         在父类方法上新增异常处理
@@ -146,20 +142,14 @@ class LesoonClient(BaseClient):
             request_url: 请求url
 
         """
-
-        try:
-            result = super()._request(
-                method=method, request_url=request_url, **kwargs)
-        except requests.HTTPError as e:
-            if e.response.status_code == ServiceUnavailable.code:
-                result = success_response(msg='系统繁忙,请稍后重试')
-            else:
-                self.log.error(f'\n【请求地址】: {method.upper()} {request_url}' +
-                               f'\n【异常信息】：{e}' +
-                               f'\n【请求参数】：{str(kwargs)[:200]}...')
-                raise ServiceError(
-                    code=ResponseCode.RemoteCallError, msg_detail=str(e))
-        return result
+        if e.response is not None and e.response.status_code == ServiceUnavailable.code:
+            return success_response(msg='系统繁忙,请稍后重试')
+        else:
+            raise RemoteCallError(
+                client=self,
+                errmsg=str(e),
+                request=e.request,
+                response=e.response)
 
     def _handle_result(
         self,
@@ -201,13 +191,11 @@ class LesoonClient(BaseClient):
             if resp.code != ResponseCode.Success.code:
                 self.log.error(f'\n【请求地址】: {method.upper()} {request_url}' +
                                f'\n【异常信息】：{resp.flag}' + f'\n【请求参数】：{kwargs}')
-                raise ServiceError(
-                    code=ResponseCode.RemoteCallError, msg=resp.msg)
+                raise RemoteCallError(client=self, errmsg=resp.msg)
             return resp
         else:
-            raise ServiceError(
-                code=ResponseCode.RemoteCallError,
-                msg=f'初始化Response对象异常:{result}')
+            raise RemoteCallError(
+                client=self, errmsg=f'初始化Response对象异常:{result}')
 
     def _page_get(
         self,

@@ -9,6 +9,8 @@ from concurrent.futures import ThreadPoolExecutor
 import requests
 from lesoon_common.utils.base import AttributeDict
 
+from lesoon_client.core.exceptions import ClientException
+
 
 class BaseClient:
     """
@@ -46,9 +48,14 @@ class BaseClient:
     def _handle_pre_request(self, method: str, kwargs: dict):
         """ 请求前预处理."""
         if 'headers' not in kwargs:
-            kwargs['headers'] = dict()
+            kwargs['headers'] = {}
+        headers = kwargs['headers']
+        if 'Content_Type' not in headers and 'content_type' not in headers:
+            kwargs['headers']['Content-Type'] = 'application/json'
 
-        kwargs['headers']['Content-Type'] = 'application/json'
+    def _handle_request_except(self, e: ClientException, func: t.Callable,
+                               *args, **kwargs):
+        raise e
 
     def _build_uri_prefix(self, kwargs: dict):
         return self.base_url + self.url_prefix
@@ -57,7 +64,11 @@ class BaseClient:
         self._handle_pre_request(method, kwargs)
         uri_prefix = self._build_uri_prefix(kwargs)
         request_url = re.sub(r'(?<!:)//', '/', uri_prefix + rule)
-        return self._request(method, request_url, **kwargs)
+        try:
+            return self._request(method, request_url, **kwargs)
+        except ClientException as e:
+            return self._handle_request_except(e, self.request, method,
+                                               request_url, **kwargs)
 
     def _request(
         self,
@@ -89,7 +100,15 @@ class BaseClient:
             method=method,
             url=request_url,
             **{k: v for k, v in kwargs.items() if k in input_request_param_key})
-        res.raise_for_status()
+        try:
+            res.raise_for_status()
+        except requests.RequestException as e:
+            self.log.error(
+                f'【请求地址】: {request_url}\n'
+                f'【请求参数】：{kwargs.get("params", "")} \n {kwargs.get("data", "")}\n'
+                f'【异常信息】：{e}')
+            raise ClientException(
+                client=self, request=e.request, response=e.response)
 
         result = self._handle_result(res, method, request_url, **kwargs)
 
@@ -100,8 +119,9 @@ class BaseClient:
 
     def _decode_result(self,
                        res: requests.Response,
-                       object_hook: t.Callable = None,
-                       object_key_hook: t.Dict[str, t.Callable] = None):
+                       object_hook: t.Optional[t.Callable] = None,
+                       object_key_hook: t.Optional[t.Dict[str,
+                                                          t.Callable]] = None):
         """
         解析请求结果.
 
@@ -122,9 +142,9 @@ class BaseClient:
                         v = getattr(res, k)
                         setattr(res, k,
                                 json.loads(json.dumps(v), object_hook=func))
-        except Exception as e:
+        except (TypeError, ValueError) as e:
             self.log.error(f'无法将调用结果转化为{object_hook}类型:{e}', exc_info=True)
-            res = res.text
+            return res.text
         return res
 
     def _handle_result(

@@ -4,6 +4,7 @@ from lesoon_common.exceptions import ServiceError
 from lesoon_common.response import Response
 
 from lesoon_client import LesoonClient
+from lesoon_client.core.exceptions import ClientException
 
 
 class SimpleClient(LesoonClient):
@@ -30,7 +31,7 @@ class TestLesoonClient:
         assert resp.code == ResponseCode.Success.code
 
     def test_invalid_response(self):
-        with pytest.raises(ServiceError):
+        with pytest.raises(ClientException):
             self.client.GET('/')
 
     def test_silent_invalid_response(self):

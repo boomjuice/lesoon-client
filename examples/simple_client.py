@@ -6,7 +6,7 @@ from lesoon_restful import Route
 from lesoon_restful import use_kwargs
 from lesoon_restful import web_fields as wf
 
-from lesoon_client.wrappers import LesoonClient
+from lesoon_client.wrappers.client import LesoonClient
 
 app = LesoonFlask(config=Config)
 api = Api(app)
