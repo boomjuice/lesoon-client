@@ -21,7 +21,7 @@ class ClientException(Exception):
 
 
 class RemoteCallError(ClientException, ServiceError):
-    code = ResponseCode.RemoteCallError
+    CODE = ResponseCode.RemoteCallError
 
     def __init__(self,
                  client: 'LesoonClient',
